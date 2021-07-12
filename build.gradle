@@ -33,6 +33,7 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	implementation 'org.axonframework:axon-spring-boot-starter:4.5.2'
 	implementation 'com.google.guava:guava:30.1.1-jre'
+	compile project(':shared')
 }
 
 dependencyManagement {
