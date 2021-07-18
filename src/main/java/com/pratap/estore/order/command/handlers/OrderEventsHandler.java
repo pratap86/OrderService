@@ -2,6 +2,7 @@ package com.pratap.estore.order.command.handlers;
 
 import com.pratap.estore.order.core.data.OrderEntity;
 import com.pratap.estore.order.core.data.OrderRepository;
+import com.pratap.estore.order.core.events.OrderApprovedEvent;
 import com.pratap.estore.order.core.events.OrderCreatedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.axonframework.config.ProcessingGroup;
@@ -30,5 +31,20 @@ public class OrderEventsHandler {
         BeanUtils.copyProperties(orderCreatedEvent, orderEntity);
         orderRepository.save(orderEntity);
 
+    }
+
+    @EventHandler
+    public void on(OrderApprovedEvent orderApprovedEvent){
+
+        log.info("Handling orderApprovedEvent={}", orderApprovedEvent);
+        OrderEntity orderEntity = orderRepository.findByOrderId(orderApprovedEvent.getOrderId());
+
+        if (orderEntity == null){
+            // TODO: Do something about it
+            return;
+        }
+
+        orderEntity.setOrderStatus(orderApprovedEvent.getOrderStatus());
+        orderRepository.save(orderEntity);
     }
 }

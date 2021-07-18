@@ -1,18 +1,27 @@
 package com.pratap.estore.order.saga;
 
+import com.pratap.estore.order.command.commands.ApproveOrderCommand;
+import com.pratap.estore.order.core.events.OrderApprovedEvent;
 import com.pratap.estore.order.core.events.OrderCreatedEvent;
+import com.pratap.estore.shared.commands.ProcessPaymentCommand;
 import com.pratap.estore.shared.commands.ProductReservedCommand;
+import com.pratap.estore.shared.events.PaymentProcessedEvent;
 import com.pratap.estore.shared.events.ProductReservedEvent;
 import com.pratap.estore.shared.model.User;
 import com.pratap.estore.shared.query.FetchUserPaymentDetailsQuery;
 import lombok.extern.slf4j.Slf4j;
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.axonframework.messaging.responsetypes.ResponseTypes;
+import org.axonframework.modelling.saga.EndSaga;
 import org.axonframework.modelling.saga.SagaEventHandler;
 import org.axonframework.modelling.saga.StartSaga;
 import org.axonframework.queryhandling.QueryGateway;
 import org.axonframework.spring.stereotype.Saga;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author Pratap Narayan
@@ -68,5 +77,39 @@ public class OrderSaga {
         } else {
             log.info("successfully fetched userPaymentDetails by userId={} and firstName={}", productReservedEvent.getUserId(), userPaymentDetails.getFirstName());
         }
+
+        ProcessPaymentCommand processPaymentCommand = ProcessPaymentCommand.builder()
+                .orderId(productReservedEvent.getOrderId())
+                .paymentDetails(Objects.requireNonNull(userPaymentDetails).getPaymentDetails())
+                .paymentId(UUID.randomUUID().toString())
+                .build();
+
+        String result = null;
+
+        try {
+            result = commandGateway.sendAndWait(processPaymentCommand, 10, TimeUnit.MILLISECONDS);
+        } catch (Exception exception){
+            log.error(exception.getMessage());
+            // start compensating transaction
+        }
+        if (result == null){
+            log.info("The ProcessPaymentCommand result is NULL, Initiating a compensating transaction");
+            // start compensating transaction
+        }
+    }
+
+    @SagaEventHandler(associationProperty = "orderId")
+    public void handle(PaymentProcessedEvent paymentProcessedEvent){
+        // send an ApproveOrderCommand
+        log.info("send an ApproveOrderCommand, paymentProcessedEvent={}", paymentProcessedEvent);
+        ApproveOrderCommand approveOrderCommand = new ApproveOrderCommand(paymentProcessedEvent.getOrderId());
+        commandGateway.send(approveOrderCommand);
+    }
+
+    @EndSaga
+    @SagaEventHandler(associationProperty = "orderId")
+    public void handle(OrderApprovedEvent orderApprovedEvent){
+        log.info("Order is Approved. OrderSaga is completed for orderId={}", orderApprovedEvent.getOrderId());
+        //SagaLifecycle.end();
     }
 }

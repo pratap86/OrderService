@@ -1,6 +1,8 @@
 package com.pratap.estore.order.command;
 
+import com.pratap.estore.order.command.commands.ApproveOrderCommand;
 import com.pratap.estore.order.command.commands.CreateOrderCommand;
+import com.pratap.estore.order.core.events.OrderApprovedEvent;
 import com.pratap.estore.order.core.events.OrderCreatedEvent;
 import com.pratap.estore.order.core.model.constant.OrderStatus;
 import lombok.NoArgsConstructor;
@@ -49,5 +51,18 @@ public class OrderAggregate {
         this.addressId = orderCreatedEvent.getAddressId();
         this.quantity = orderCreatedEvent.getQuantity();
         this.orderStatus = orderCreatedEvent.getOrderStatus();
+    }
+
+    @CommandHandler
+    public void handle(ApproveOrderCommand approveOrderCommand){
+        // create and publish the OrderApproveEvent
+        log.info("create and publish the OrderApproveEvent, approveOrderCommand={}", approveOrderCommand);
+        OrderApprovedEvent orderApprovedEvent = new OrderApprovedEvent(approveOrderCommand.getOrderId());
+        AggregateLifecycle.apply(orderApprovedEvent);
+    }
+
+    @EventSourcingHandler
+    public void on(OrderApprovedEvent orderApprovedEvent){
+        this.orderStatus = orderApprovedEvent.getOrderStatus();
     }
 }
